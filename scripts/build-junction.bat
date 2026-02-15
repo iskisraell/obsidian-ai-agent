@@ -45,29 +45,8 @@ echo.
 echo [INFO] Starting Tauri production build...
 echo [INFO] This will take several minutes on first run...
 echo.
-set BUILD_OK=0
-
 bun run tauri:build
-if not errorlevel 1 (
-    set BUILD_OK=1
-) else (
-    echo.
-    echo [WARNING] bun run tauri:build failed in this environment.
-    echo [INFO] Trying fallback: cargo tauri build
-    echo.
-    cargo tauri -V >nul 2>&1
-    if errorlevel 1 (
-        echo [ERROR] cargo-tauri is not installed.
-        echo         Install with: cargo install tauri-cli --locked
-    ) else (
-        cargo tauri build
-        if not errorlevel 1 (
-            set BUILD_OK=1
-        )
-    )
-)
-
-if "!BUILD_OK!"=="0" (
+if errorlevel 1 (
     echo.
     echo [ERROR] Build failed!
     echo.

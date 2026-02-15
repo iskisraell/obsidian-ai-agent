@@ -5,20 +5,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 
-export function NotePreview({ markdown }: { markdown: string }) {
+interface NotePreviewProps {
+  markdown: string
+  canPublish: boolean
+  isPublishing: boolean
+  onRefresh: () => void
+  onPublish: () => void
+}
+
+export function NotePreview({ markdown, canPublish, isPublishing, onRefresh, onPublish }: NotePreviewProps) {
   return (
     <Card className="border-primary/30 bg-card/80">
       <CardHeader className="border-b border-border pb-4">
         <CardTitle className="flex items-center justify-between text-sm tracking-[0.12em] uppercase">
           Obsidian Note Preview
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="gap-2">
+            <Button size="sm" variant="outline" className="gap-2" onClick={onRefresh} disabled={!canPublish}>
               <FilePenLine className="size-4" />
-              Edit Prompt
+              Refresh
             </Button>
-            <Button size="sm" className="gap-2 bg-primary/90 hover:bg-primary">
+            <Button
+              size="sm"
+              className="gap-2 bg-primary/90 hover:bg-primary"
+              onClick={onPublish}
+              disabled={!canPublish || isPublishing}
+            >
               <Check className="size-4" />
-              Publish
+              {isPublishing ? "Publishing..." : "Publish"}
             </Button>
           </div>
         </CardTitle>

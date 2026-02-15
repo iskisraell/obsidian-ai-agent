@@ -43,31 +43,11 @@ echo.
 echo [INFO] Starting Tauri development server...
 echo [INFO] This will take several minutes on first run...
 echo.
-set DEV_OK=0
-
 bun run tauri:dev
-if not errorlevel 1 (
-    set DEV_OK=1
-) else (
-    echo.
-    echo [WARNING] bun run tauri:dev failed in this environment.
-    echo [INFO] Trying fallback: cargo tauri dev
-    echo.
-    cargo tauri -V >nul 2>&1
-    if errorlevel 1 (
-        echo [ERROR] cargo-tauri is not installed.
-        echo         Install with: cargo install tauri-cli --locked
-    ) else (
-        cargo tauri dev
-        if not errorlevel 1 (
-            set DEV_OK=1
-        )
-    )
-)
-
-if "!DEV_OK!"=="0" (
+if errorlevel 1 (
     echo.
     echo [ERROR] Dev startup failed!
+    echo         Ensure cargo-tauri is installed: cargo install tauri-cli --locked
     pause
     exit /b 1
 )

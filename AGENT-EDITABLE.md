@@ -1,27 +1,24 @@
 ## Backlog
-- [critical] Fix Bun/Vitest module resolution failure when running tests from junction path.
-  - Plan: execute tests from original workspace path (non-junction) via a dedicated script, and split CI/local test commands so junction is used only for Tauri Rust builds.
-  - Blast radius: `package.json` scripts, `scripts/*.bat`, developer workflow docs.
+- [critical] Harden Tauri packaging pipeline against stale frontend artifacts.
+  - Plan: keep `beforeBuildCommand` in Tauri config, keep root `build` script web-aware, and add CI/assertion step that checks packaged `dist/assets/*.js` contains live command ids (`enqueue_ingestion`, `publish_note`) before release.
+  - Blast radius: `src-tauri/tauri.conf.json`, `package.json`, release scripts/docs.
+- [high] Resolve Vite build instability caused by compatibility-path / junction resolution.
+  - Plan: remove reliance on short-path workaround by forcing canonical project root in build tooling (or removing junction indirection), then validate `bun run build` succeeds from `C:\dev\obsidian-ai-agent`.
+  - Blast radius: `scripts/*.bat`, Vite build flow, developer setup docs.
+- [medium] Remove machine-specific Vitest fs allowlist workaround.
+  - Plan: identify and fix the root path canonicalization source so `vitest.config.ts` no longer needs compatibility path allowlisting.
+  - Blast radius: `vitest.config.ts`, local test runner behavior across Windows setups.
 - [high] Add guardrails for GNU linker export overflow (`export ordinal too large`) in desktop Tauri templates.
   - Plan: document and enforce desktop-safe crate types (`staticlib`, `rlib`) in project scaffolding; add a startup check in scripts/docs to flag `cdylib` usage on GNU targets.
   - Blast radius: `src-tauri/Cargo.toml`, project templates, cross-project workaround docs.
-- [high] Enforce valid ingestion media types at command boundary.
-  - Plan: validate `request.file_paths` in `enqueue_ingestion` and reject unknown extensions with deterministic error payload.
-  - Blast radius: `src-tauri/src/lib.rs`, `src-tauri/src/ingestion/mod.rs`, frontend error states.
-- [high] Respect `write_mode` in note publication pipeline.
-  - Plan: route publish behavior by settings (`cli_only`, `filesystem_only`, `cli_fallback`) instead of always trying CLI first.
-  - Blast radius: `src-tauri/src/obsidian/mod.rs`, settings UI/contracts, tests.
-- [high] Guard job status transitions to prevent invalid concurrent state changes.
-  - Plan: implement transition matrix in repository update queries (e.g., queued->processing/completed/failed, processing->completed/failed/cancelled).
-  - Blast radius: `src-tauri/src/db/repository.rs`, command handlers, UI status semantics.
 - [medium] Decompose dashboard shell into feature-level presentational components.
   - Plan: split hero metrics, timeline, side rails, and pulse matrix into focused components with typed props and memo-safe static data.
   - Blast radius: `src/app/dashboard-shell.tsx`, `src/lib/mock-data.ts`, tests/snapshots.
-- [high] Add secure secret storage strategy for Gemini API key.
-  - Plan: evaluate Tauri plugin-store + OS keychain approach and migrate from plain settings storage.
-  - Blast radius: settings screen, backend config loader, migration.
+- [medium] Add optional key rotation helper and key validation ping in runtime settings.
+  - Plan: add a lightweight Gemini auth check command and surface "last validated at" in UI after key save.
+  - Blast radius: settings panel, tauri-client contracts, gemini command surface.
 - [high] Implement real Gemini multimodal processing pipeline (upload, state polling, structured extraction schema).
-  - Plan: replace current stub in `src-tauri/src/gemini/mod.rs` and wire async job worker.
+  - Plan: extend current text-only `generateContent` integration in `src-tauri/src/gemini/mod.rs` to full multimodal Files API upload/poll pipeline with structured JSON extraction and background worker orchestration.
   - Blast radius: job orchestration, DB model, prompt templates, error handling, UI status states.
 - [medium] Add robust retry policy with jitter and resumable state for long media extraction jobs.
   - Plan: persist per-step retry counters and backoff policy in DB.
@@ -31,12 +28,24 @@
   - Blast radius: db module and app startup.
 
 ## Findings
+- Packaged app showed stale mock dashboard because `dist` was not rebuilt during Tauri build; `frontendDist` pointed to old assets from `2026-02-14`.
+- Vite build path issue is currently mitigated by resolving canonical realpath in `scripts/build-web.bat`; direct ad-hoc `bunx vite build` from junction paths remains unreliable.
 - Obsidian desktop is installed locally, but `obsidian` command is not currently available in PATH.
 - Vault exists and is currently minimal (`Welcome.md` only), which allows us to define note structure from scratch.
 - Shell environment does not expose Bun/Rust in PATH by default; scripts need explicit path bootstrap.
 - Bun + Tauri + GNU may fail at link time with `export ordinal too large` when `cdylib` is enabled in desktop crates.
+- Bun may segfault when invoking Node-based `@tauri-apps/cli` (`tauri dev/build`); Cargo-tauri mapping is stable.
+- `bun run test` is passing again after Vitest fs compatibility allowlist change; root cause of `/@fs/...DESENV~1...` path indirection is still unresolved.
+- Runtime dashboard is now connected to real Tauri commands (`enqueue_ingestion`, `list_jobs`, `get_settings`, `save_settings`, `preview_note`, `publish_note`) and no longer depends on `mock-data` for app state.
+- Gemini integration now performs live `generateContent` calls for note insights when `GEMINI_API_KEY` is present, but multimodal Files API and structured output workflow are still pending.
+- Gemini API key is now managed via OS keychain-backed Tauri commands; environment variable fallback remains for compatibility.
 
 ## Session Notes
+- 2026-02-15: Diagnosed “buttons not working + mock data still visible” as stale packaged frontend bundle; patched build pipeline and rebuilt `dist` with live command-wired dashboard assets.
+- 2026-02-15: Stabilized web build on Windows by introducing realpath-aware wrapper script and swapping `bunx` for direct `bun.exe node_modules/vite/bin/vite.js` invocation.
+- 2026-02-15: Confirmed `bun run tauri:build -- --no-bundle` now runs `beforeBuildCommand`, rebuilds frontend assets, and compiles release executable successfully.
+- 2026-02-15: Generated fresh NSIS installer post-fix and verified output path for reinstallation/testing.
+- 2026-02-15: Implemented secure in-app Gemini API key management using OS keychain, plus frontend status/set/clear controls.
 - 2026-02-14: Bootstrapped Vite + React + Tauri, started project governance docs, and began shadcn/Tailwind setup for brutalist Obsidian-inspired UI.
 - 2026-02-14: Implemented full first-pass frontend dashboard and secure local Rust command surface.
 - 2026-02-14: Build caveat observed: `bun run` nested invocation of `bunx vite build` can crash on this Windows environment; direct command execution succeeds.
@@ -46,3 +55,7 @@
 - 2026-02-15: Test suite still fails under Bun/Vitest due junction path resolution (`/@fs/...DESENV~1...`); captured as critical workflow debt.
 - 2026-02-15: Added `tauri-dev.bat` and `tauri-build.bat` auto-junction scripts plus Bun aliases for simpler out-of-the-box dev/build commands.
 - 2026-02-15: Resolved GNU linker overflow class by removing `cdylib` from `src-tauri/Cargo.toml` crate types for this desktop project and documented reusable fix.
+- 2026-02-15: Eliminated persistent build instability by mapping `tauri:dev/build` scripts to `cargo tauri dev/build`, avoiding Bun runtime crashes in Node CLI launch path.
+- 2026-02-15: Implemented build-agent execution slice for backend/frontend functionality: versioned DB migrations, ingestion validation+copy+hash, write-mode aware Obsidian publishing, strict settings contracts, and live dashboard wiring.
+- 2026-02-15: Added Tauri dialog plugin and capability permission for real file selection, and restored green local checks (`bun run typecheck`, `bun run test`, `cargo check`).
+- 2026-02-15: Upgraded `src-tauri/src/gemini/mod.rs` from stub to live Gemini API client (`generateContent`) and integrated AI summary fallback behavior into preview/publish command flow.

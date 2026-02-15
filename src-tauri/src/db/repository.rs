@@ -1,15 +1,29 @@
 use rusqlite::{params, OptionalExtension};
 
-use crate::models::{JobAsset, JobDetails, JobSummary, SettingsPayload};
+use crate::{
+  ingestion::PreparedAsset,
+  models::{JobAsset, JobDetails, JobSummary, SettingsPayload},
+};
 
 use super::super::app_state::DbConnection;
+
+fn can_transition(current_status: &str, next_status: &str) -> bool {
+  match current_status {
+    "queued" => matches!(next_status, "processing" | "cancelled" | "failed"),
+    "processing" => matches!(next_status, "completed" | "failed" | "cancelled"),
+    "failed" => next_status == "queued",
+    "cancelled" => next_status == "queued",
+    "completed" => false,
+    _ => false,
+  }
+}
 
 pub fn insert_job_with_assets(
   conn: &mut DbConnection,
   job_id: &str,
   title: &str,
   status: &str,
-  file_paths: &[String],
+  assets: &[PreparedAsset],
   now: i64,
 ) -> Result<(), String> {
   let tx = conn
@@ -26,15 +40,33 @@ pub fn insert_job_with_assets(
     )
     .map_err(|error| format!("failed to insert ingestion job: {error}"))?;
 
-  for path in file_paths {
-    let media_type = crate::ingestion::infer_media_type(path);
+  for asset in assets {
     tx
       .execute(
         "
-        INSERT INTO media_asset (job_id, original_path, media_type, created_at)
-        VALUES (?1, ?2, ?3, ?4)
+        INSERT INTO media_asset (
+          job_id,
+          original_path,
+          storage_path,
+          media_type,
+          mime_type,
+          size_bytes,
+          sha256,
+          duration_ms,
+          created_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, ?8)
         ",
-        params![job_id, path, media_type, now],
+        params![
+          job_id,
+          asset.original_path,
+          asset.storage_path,
+          asset.media_type,
+          asset.mime_type,
+          asset.size_bytes,
+          asset.sha256,
+          now
+        ],
       )
       .map_err(|error| format!("failed to insert media asset: {error}"))?;
   }
@@ -124,7 +156,7 @@ pub fn find_job_with_assets(conn: &DbConnection, job_id: &str) -> Result<Option<
   let mut assets_stmt = conn
     .prepare(
       "
-      SELECT id, job_id, original_path, media_type
+      SELECT id, job_id, original_path, storage_path, media_type, mime_type, size_bytes, sha256
       FROM media_asset
       WHERE job_id = ?1
       ORDER BY id ASC
@@ -138,7 +170,11 @@ pub fn find_job_with_assets(conn: &DbConnection, job_id: &str) -> Result<Option<
         id: row.get(0)?,
         job_id: row.get(1)?,
         original_path: row.get(2)?,
-        media_type: row.get(3)?,
+        storage_path: row.get(3)?,
+        media_type: row.get(4)?,
+        mime_type: row.get(5)?,
+        size_bytes: row.get(6)?,
+        sha256: row.get(7)?,
       })
     })
     .map_err(|error| format!("failed to run job assets query: {error}"))?;
@@ -151,13 +187,31 @@ pub fn find_job_with_assets(conn: &DbConnection, job_id: &str) -> Result<Option<
   Ok(Some(JobDetails { job, assets }))
 }
 
-pub fn update_job_status(conn: &DbConnection, job_id: &str, status: &str, now: i64) -> Result<bool, String> {
+pub fn update_job_status(conn: &DbConnection, job_id: &str, next_status: &str, now: i64) -> Result<bool, String> {
+  let current_status = conn
+    .query_row(
+      "SELECT status FROM ingestion_job WHERE id = ?1",
+      [job_id],
+      |row| row.get::<_, String>(0),
+    )
+    .optional()
+    .map_err(|error| format!("failed to load current job status: {error}"))?;
+
+  let Some(current_status) = current_status else {
+    return Ok(false);
+  };
+
+  if !can_transition(&current_status, next_status) {
+    return Err(format!("invalid status transition: {current_status} -> {next_status}"));
+  }
+
   let changed = conn
     .execute(
       "UPDATE ingestion_job SET status = ?1, updated_at = ?2 WHERE id = ?3",
-      params![status, now, job_id],
+      params![next_status, now, job_id],
     )
     .map_err(|error| format!("failed to update job status: {error}"))?;
+
   Ok(changed > 0)
 }
 
@@ -183,6 +237,11 @@ pub fn get_settings(conn: &DbConnection) -> Result<SettingsPayload, String> {
 }
 
 pub fn save_settings(conn: &DbConnection, payload: &SettingsPayload) -> Result<(), String> {
+  let write_mode = match payload.write_mode.trim() {
+    "cli_only" | "filesystem_only" | "cli_fallback" => payload.write_mode.trim(),
+    _ => return Err("write_mode must be cli_only, filesystem_only, or cli_fallback".to_string()),
+  };
+
   conn
     .execute(
       "
@@ -191,10 +250,10 @@ pub fn save_settings(conn: &DbConnection, payload: &SettingsPayload) -> Result<(
       WHERE id = 1
       ",
       params![
-        payload.vault_path,
-        payload.obsidian_cli_path,
-        payload.gemini_model,
-        payload.write_mode
+        payload.vault_path.trim(),
+        payload.obsidian_cli_path.trim(),
+        payload.gemini_model.trim(),
+        write_mode,
       ],
     )
     .map_err(|error| format!("failed to save settings: {error}"))?;

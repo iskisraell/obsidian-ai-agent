@@ -23,3 +23,28 @@
 2026-02-15 - Added simple Bun aliases (`bun run tauri-dev`, `bun run tauri-build`) and updated project/shared docs with PowerShell-first usage for any Tauri project.
 2026-02-15 - Investigated `bun run tauri-dev` linker failure (`export ordinal too large`) on GNU target; fixed by removing `cdylib` from desktop crate types in `src-tauri/Cargo.toml`.
 2026-02-15 - Documented the GNU linker overflow root cause and fix in shared reference `C:\Users\israel.toledo\Documents\Projetos e Outros\SINQ-TAURI-WINDOWS-WORKAROUNDS.md`.
+2026-02-15 - Root-caused persistent build instability to Bun crash when invoking Node-based Tauri CLI; switched package scripts to `cargo tauri dev/build` while keeping Bun entrypoint.
+2026-02-15 - Simplified dev/build wrapper scripts to remove fallback branching and rely on stable Cargo-tauri path.
+2026-02-15 - Added `scripts/tauri-cargo-dev.bat` and `scripts/tauri-cargo-build.bat` so direct `bun run tauri:dev/build` also initializes environment and avoids `cargo not found`.
+2026-02-15 - Confirmed installer location and clarified path semantics: final `.exe` is under `release/bundle/nsis`, while `release/nsis/x64` is NSIS script artifacts only.
+2026-02-15 - Applied Rust release-profile build-speed tuning (`incremental=true`, higher `codegen-units`, `lto=false`) and validated fast incremental rebuild path.
+2026-02-15 - Build Agent execution slice: replaced dashboard runtime mocks with live React Query + Tauri command wiring for enqueue, settings save, note preview, and publish flows.
+2026-02-15 - Implemented ingestion hardening in Rust: canonicalized source file validation, MIME/ext checks, 2GB cap, SHA-256 hashing, and copied media storage under app data.
+2026-02-15 - Upgraded SQLite migration system to versioned migrations and expanded schema with extraction traceability tables, job events, and FTS trigger/index coverage.
+2026-02-15 - Implemented Obsidian write-mode routing (`cli_only`, `filesystem_only`, `cli_fallback`) with CLI candidate resolution and atomic filesystem writes.
+2026-02-15 - Added Tauri dialog plugin and permissions; validated `bun run typecheck`, `bun run test`, and `cargo check` (with `scripts/init-env.bat`).
+2026-02-15 - Fixed recurring Vitest module resolution issue by allowing the compatibility workspace path in `vitest.config.ts` server fs allowlist.
+2026-02-15 - Replaced Gemini stub with live `generateContent` integration (via `reqwest`), feeding AI summaries into note preview/publish when `GEMINI_API_KEY` is available, with deterministic fallback on missing/failed API calls.
+2026-02-15 - Root-caused non-functional packaged UI to stale `dist` bundle (old mock dashboard assets still shipped) due missing Tauri `beforeBuildCommand` and non-web `build` script.
+2026-02-15 - Added build pipeline guards: `src-tauri/tauri.conf.json` now runs `beforeBuildCommand: bun run build`, and `package.json` `build` now executes `tsc -b && bun run build:web`.
+2026-02-15 - Rebuilt frontend from canonical compatibility path and validated updated assets (`dist/assets/index-Dx3Lq2E7.js`) now include live Tauri command wiring (`enqueue_ingestion`, `save_settings`, `publish_note`) instead of static mock-only panel behavior.
+2026-02-15 - Validation: `bun run typecheck` and `bun run test` both pass after build pipeline changes.
+2026-02-15 - Added resilient web build wrapper (`scripts/build-web.bat`) plus realpath resolver (`scripts/print-cwd-realpath.mjs`) to avoid Vite path emission failures under Windows junction/compatibility paths.
+2026-02-15 - Replaced unstable `bunx vite build` invocation with `bun.exe node_modules/vite/bin/vite.js build` in the wrapper, eliminating Bun segmentation faults in `bun run build`.
+2026-02-15 - Validation: `scripts/build-web.bat`, `bun run build`, `bun run typecheck`, and `bun run test` all pass from `C:\dev\obsidian-ai-agent`.
+2026-02-15 - Verified full Tauri pipeline with `bun run tauri:build -- --no-bundle`; confirmed `beforeBuildCommand` executes, web assets rebuild, and release binary compiles successfully.
+2026-02-15 - Produced fresh NSIS installer after pipeline fix (`src-tauri/target/x86_64-pc-windows-gnu/release/bundle/nsis/Obsidian AI Agent_0.1.0_x64-setup.exe`), ensuring packaged app includes live backend-connected frontend bundle.
+2026-02-15 - Implemented secure Gemini API key flow with OS keychain storage (`keyring` crate) and Tauri commands (`get_gemini_api_key_status`, `save_gemini_api_key`, `clear_gemini_api_key`).
+2026-02-15 - Wired settings UI to real API key management (set/clear/status, key source visibility for keychain vs environment fallback) and removed static placeholder behavior.
+2026-02-15 - Updated AI summary resolution to use keychain-first secret lookup with environment fallback, plus clearer note-preview fallback guidance.
+2026-02-15 - Validation: `bun run typecheck`, `bun run test`, `bun run tauri:build -- --no-bundle`, and `bun run tauri:build` all pass with secure key flow integrated.

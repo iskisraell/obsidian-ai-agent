@@ -7,7 +7,10 @@ use std::{
 
 use serde_json::Value;
 
-use crate::models::{PublishNoteResponse, SettingsPayload};
+use crate::{
+  models::{PublishNoteResponse, SettingsPayload, WriteMode},
+  time_now_ms,
+};
 
 fn sanitize_file_name(input: &str) -> String {
   input
@@ -51,8 +54,9 @@ fn direct_write(vault_path: &Path, title: &str, markdown: &str) -> Result<String
   fs::create_dir_all(&captures_dir).map_err(|error| format!("failed to create capture dir: {error}"))?;
 
   let safe_name = sanitize_file_name(title);
+  let now = time_now_ms();
   let final_path = captures_dir.join(format!("{safe_name}.md"));
-  let temp_path = captures_dir.join(format!("{safe_name}.tmp"));
+  let temp_path = captures_dir.join(format!("{safe_name}.{now}.tmp"));
 
   {
     let mut file =
@@ -60,6 +64,9 @@ fn direct_write(vault_path: &Path, title: &str, markdown: &str) -> Result<String
     file
       .write_all(markdown.as_bytes())
       .map_err(|error| format!("failed to write note content: {error}"))?;
+    file
+      .sync_all()
+      .map_err(|error| format!("failed to flush temp note file: {error}"))?;
   }
 
   fs::rename(&temp_path, &final_path).map_err(|error| format!("failed to atomically write note: {error}"))?;
@@ -74,48 +81,87 @@ fn direct_write(vault_path: &Path, title: &str, markdown: &str) -> Result<String
   Ok(canonical_note.to_string_lossy().to_string())
 }
 
-fn try_cli_write(settings: &SettingsPayload, vault_path: &Path, title: &str, markdown: &str) -> Result<(), String> {
-  let cli_path = if settings.obsidian_cli_path.trim().is_empty() {
-    "obsidian"
-  } else {
-    settings.obsidian_cli_path.trim()
-  };
+fn cli_candidates(settings: &SettingsPayload) -> Vec<PathBuf> {
+  let mut candidates = Vec::new();
 
-  let output = Command::new(cli_path)
-    .arg("note")
-    .arg("create")
-    .arg("--vault")
-    .arg(vault_path.to_string_lossy().to_string())
-    .arg("--name")
-    .arg(title)
-    .arg("--content")
-    .arg(markdown)
-    .output();
-
-  match output {
-    Ok(result) if result.status.success() => Ok(()),
-    Ok(result) => {
-      let stderr = String::from_utf8_lossy(&result.stderr);
-      Err(format!("obsidian cli exited with error: {stderr}"))
-    }
-    Err(error) => Err(format!("failed to execute obsidian cli: {error}")),
+  if !settings.obsidian_cli_path.trim().is_empty() {
+    candidates.push(PathBuf::from(settings.obsidian_cli_path.trim()));
   }
+  candidates.push(PathBuf::from("obsidian"));
+
+  if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+    let exe_path = PathBuf::from(local_app_data)
+      .join("Programs")
+      .join("Obsidian")
+      .join("Obsidian.exe");
+    candidates.push(exe_path);
+  }
+
+  candidates
+}
+
+fn try_cli_write(settings: &SettingsPayload, vault_path: &Path, title: &str, markdown: &str) -> Result<(), String> {
+  let mut errors = Vec::new();
+
+  for candidate in cli_candidates(settings) {
+    let output = Command::new(&candidate)
+      .arg("note")
+      .arg("create")
+      .arg("--vault")
+      .arg(vault_path.to_string_lossy().to_string())
+      .arg("--name")
+      .arg(title)
+      .arg("--content")
+      .arg(markdown)
+      .output();
+
+    match output {
+      Ok(result) if result.status.success() => return Ok(()),
+      Ok(result) => {
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        errors.push(format!("{}: {}", candidate.to_string_lossy(), stderr));
+      }
+      Err(error) => errors.push(format!("{}: {}", candidate.to_string_lossy(), error)),
+    }
+  }
+
+  Err(format!("failed to publish through Obsidian CLI candidates: {}", errors.join(" | ")))
 }
 
 pub fn publish_note(settings: &SettingsPayload, title: &str, markdown: &str) -> Result<PublishNoteResponse, String> {
   let vault_path = resolve_vault_path(settings)?;
+  let write_mode = WriteMode::parse(&settings.write_mode);
 
-  if try_cli_write(settings, &vault_path, title, markdown).is_ok() {
-    let note_path = vault_path.join("AI Captures").join(format!("{}.md", sanitize_file_name(title)));
-    return Ok(PublishNoteResponse {
-      note_path: note_path.to_string_lossy().to_string(),
-      method: "cli".to_string(),
-    });
+  match write_mode {
+    WriteMode::FilesystemOnly => {
+      let note_path = direct_write(&vault_path, title, markdown)?;
+      Ok(PublishNoteResponse {
+        note_path,
+        method: "filesystem".to_string(),
+      })
+    }
+    WriteMode::CliOnly => {
+      try_cli_write(settings, &vault_path, title, markdown)?;
+      let note_path = vault_path.join("AI Captures").join(format!("{}.md", sanitize_file_name(title)));
+      Ok(PublishNoteResponse {
+        note_path: note_path.to_string_lossy().to_string(),
+        method: "cli".to_string(),
+      })
+    }
+    WriteMode::CliFallback => {
+      if try_cli_write(settings, &vault_path, title, markdown).is_ok() {
+        let note_path = vault_path.join("AI Captures").join(format!("{}.md", sanitize_file_name(title)));
+        return Ok(PublishNoteResponse {
+          note_path: note_path.to_string_lossy().to_string(),
+          method: "cli".to_string(),
+        });
+      }
+
+      let note_path = direct_write(&vault_path, title, markdown)?;
+      Ok(PublishNoteResponse {
+        note_path,
+        method: "filesystem_fallback".to_string(),
+      })
+    }
   }
-
-  let note_path = direct_write(&vault_path, title, markdown)?;
-  Ok(PublishNoteResponse {
-    note_path,
-    method: "filesystem_fallback".to_string(),
-  })
 }

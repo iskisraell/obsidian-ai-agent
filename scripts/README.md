@@ -4,14 +4,22 @@ Windows helper scripts for building this Tauri app without admin permissions.
 
 ## Main scripts
 
+- `tauri-cargo-dev.bat`
+  - Runs `init-env.bat` then executes `cargo tauri dev`.
+  - Used by `bun run tauri:dev` to avoid Bun Node-CLI crash path and PATH drift.
+
+- `tauri-cargo-build.bat`
+  - Runs `init-env.bat` then executes `cargo tauri build`.
+  - Used by `bun run tauri:build` to avoid Bun Node-CLI crash path and PATH drift.
+
 - `tauri-dev.bat`
   - Auto-detects the current project folder and creates/uses `C:\Dev\<project-folder-name>` junction.
-  - Initializes environment and runs Tauri dev with fallback to `cargo tauri dev`.
+  - Initializes environment and runs Tauri dev.
   - Supports: `--clean`, `--dry-run`.
 
 - `tauri-build.bat`
   - Auto-detects the current project folder and creates/uses `C:\Dev\<project-folder-name>` junction.
-  - Initializes environment and runs Tauri build with fallback to `cargo tauri build`.
+  - Initializes environment and runs Tauri build.
   - Supports: `--clean`, `--dry-run`.
 
 - `dev-junction.bat`
@@ -21,7 +29,7 @@ Windows helper scripts for building this Tauri app without admin permissions.
 - `build-junction.bat`
   - Uses the same junction strategy for production builds.
   - Runs `bun run tauri:build`.
-  - Fallback: if Bun fails in this environment, it automatically tries `cargo tauri build`.
+  - `tauri:build` is mapped to `cargo tauri build` in `package.json` for stability.
 
 - `tauri-start-junction-dev.bat`
   - Wrapper alias for `dev-junction.bat` (same behavior).

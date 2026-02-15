@@ -49,21 +49,10 @@ if "%CLEAN%"=="1" (
 )
 
 echo [INFO] Starting Tauri dev...
-set DEV_OK=0
 bun run tauri:dev
-if not errorlevel 1 (
-  set DEV_OK=1
-) else (
-  echo [WARNING] bun run tauri:dev failed. Trying cargo tauri dev...
-  cargo tauri -V >nul 2>&1
-  if not errorlevel 1 (
-    cargo tauri dev
-    if not errorlevel 1 set DEV_OK=1
-  )
-)
-
-if "!DEV_OK!"=="0" (
+if errorlevel 1 (
   echo [ERROR] Dev startup failed.
+  echo         Ensure cargo-tauri is installed: cargo install tauri-cli --locked
   exit /b 1
 )
 

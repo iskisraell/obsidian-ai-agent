@@ -22,6 +22,24 @@ impl JobStatus {
   }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum WriteMode {
+  CliOnly,
+  FilesystemOnly,
+  CliFallback,
+}
+
+impl WriteMode {
+  pub fn parse(value: &str) -> Self {
+    match value.trim() {
+      "cli_only" => WriteMode::CliOnly,
+      "filesystem_only" => WriteMode::FilesystemOnly,
+      _ => WriteMode::CliFallback,
+    }
+  }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EnqueueIngestionRequest {
   pub file_paths: Vec<String>,
@@ -48,7 +66,11 @@ pub struct JobAsset {
   pub id: i64,
   pub job_id: String,
   pub original_path: String,
+  pub storage_path: String,
   pub media_type: String,
+  pub mime_type: String,
+  pub size_bytes: i64,
+  pub sha256: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -68,6 +90,12 @@ pub struct SettingsPayload {
   pub obsidian_cli_path: String,
   pub gemini_model: String,
   pub write_mode: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GeminiApiKeyStatus {
+  pub configured: bool,
+  pub source: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

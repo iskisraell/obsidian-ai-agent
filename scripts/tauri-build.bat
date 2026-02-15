@@ -49,24 +49,19 @@ if "%CLEAN%"=="1" (
 )
 
 echo [INFO] Starting Tauri build...
-set BUILD_OK=0
 bun run tauri:build
-if not errorlevel 1 (
-  set BUILD_OK=1
-) else (
-  echo [WARNING] bun run tauri:build failed. Trying cargo tauri build...
-  cargo tauri -V >nul 2>&1
-  if not errorlevel 1 (
-    cargo tauri build
-    if not errorlevel 1 set BUILD_OK=1
-  )
-)
-
-if "!BUILD_OK!"=="0" (
+if errorlevel 1 (
   echo [ERROR] Build failed.
+  echo         Ensure cargo-tauri is installed: cargo install tauri-cli --locked
   exit /b 1
 )
 
 echo [OK] Build finished.
 echo [INFO] Output: src-tauri\target\x86_64-pc-windows-gnu\release\bundle\nsis\
+if exist "src-tauri\target\x86_64-pc-windows-gnu\release\bundle\nsis\*.exe" (
+  echo [OK] Installer generated:
+  dir /b "src-tauri\target\x86_64-pc-windows-gnu\release\bundle\nsis\*.exe"
+) else (
+  echo [WARNING] Build completed but installer .exe was not found in bundle\nsis.
+)
 exit /b 0

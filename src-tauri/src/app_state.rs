@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::path::PathBuf;
 
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
@@ -11,6 +12,7 @@ pub type DbConnection = PooledConnection<SqliteConnectionManager>;
 
 pub struct AppState {
   pub db_pool: DbPool,
+  pub media_root: PathBuf,
 }
 
 impl AppState {
@@ -22,6 +24,9 @@ impl AppState {
 
     std::fs::create_dir_all(&app_data_dir)
       .map_err(|error| format!("failed to create app data directory: {error}"))?;
+    let media_root = app_data_dir.join("media");
+    std::fs::create_dir_all(&media_root)
+      .map_err(|error| format!("failed to create media directory: {error}"))?;
 
     let db_path = app_data_dir.join("obsidian_ai_agent.db");
     let manager = SqliteConnectionManager::file(db_path).with_init(|conn| {
@@ -47,7 +52,10 @@ impl AppState {
       migrations::run(&conn)?;
     }
 
-    Ok(Self { db_pool: Arc::new(pool) })
+    Ok(Self {
+      db_pool: Arc::new(pool),
+      media_root,
+    })
   }
 
   pub fn conn(&self) -> Result<DbConnection, String> {

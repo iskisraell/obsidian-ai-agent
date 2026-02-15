@@ -23,11 +23,9 @@ C:\Users\israel.toledo\.bun\bin\bun.exe run dev
 C:\Users\israel.toledo\.bun\bin\bun.exe run typecheck
 C:\Users\israel.toledo\.bun\bin\bun.exe run test
 C:\Users\israel.toledo\.bun\bin\bun.exe run build
-C:\Users\israel.toledo\.bun\bin\bunx.exe vite build --configLoader runner
 ```
 
-`bun run build` currently runs TypeScript project build checks (`tsc -b`).
-Use direct `bunx vite build --configLoader runner` for frontend artifact generation on this Windows environment.
+`bun run build` runs TypeScript checks and frontend build output generation (`dist/`).
 
 ## Tauri (Windows, no-admin workflow)
 
@@ -55,7 +53,9 @@ OBSIDIAN_VAULT_PATH=C:\path\to\your\vault
 OBSIDIAN_CLI_PATH=obsidian
 ```
 
-The app currently persists settings locally in SQLite and supports overriding these values in the UI settings panel.
+The app persists runtime settings in SQLite.
+Gemini API key can be configured securely in-app (Runtime Settings) and stored in OS keychain.
+`GEMINI_API_KEY` env var is still supported as fallback.
 
 ## Core Behavior
 

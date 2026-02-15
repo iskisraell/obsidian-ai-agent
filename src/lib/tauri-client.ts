@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core"
 import type {
   EnqueueIngestionRequest,
   EnqueueIngestionResponse,
+  GeminiApiKeyStatus,
   JobDetails,
   JobSummary,
   PreviewNoteResponse,
@@ -31,6 +32,15 @@ export const getSettings = () => invokeCommand<SettingsPayload>("get_settings")
 
 export const saveSettings = (payload: SettingsPayload) =>
   invokeCommand<SettingsPayload>("save_settings", { payload })
+
+export const getGeminiApiKeyStatus = () =>
+  invokeCommand<GeminiApiKeyStatus>("get_gemini_api_key_status")
+
+export const saveGeminiApiKey = (apiKey: string) =>
+  invokeCommand<void>("save_gemini_api_key", { api_key: apiKey })
+
+export const clearGeminiApiKey = () =>
+  invokeCommand<void>("clear_gemini_api_key")
 
 export const previewNote = (jobId: string) =>
   invokeCommand<PreviewNoteResponse>("preview_note", { job_id: jobId })

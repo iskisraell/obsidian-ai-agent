@@ -4,6 +4,7 @@ mod gemini;
 mod ingestion;
 mod models;
 mod obsidian;
+mod secrets;
 
 use tauri::{AppHandle, Manager, State};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -11,7 +12,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use app_state::AppState;
 use db::repository;
 use models::{
-  EnqueueIngestionRequest, EnqueueIngestionResponse, JobDetails, JobStatus, JobSummary,
+  EnqueueIngestionRequest, EnqueueIngestionResponse, GeminiApiKeyStatus, JobDetails, JobStatus, JobSummary,
   PreviewNoteResponse, PublishNoteResponse, SettingsPayload, UpdateJobResponse,
 };
 
@@ -30,21 +31,59 @@ fn make_job_id(now: i64) -> String {
   format!("job-{now}-{sequence}")
 }
 
-fn build_note_markdown(job: &JobDetails) -> String {
+fn build_note_markdown(job: &JobDetails, ai_summary: Option<&str>) -> String {
   let mut markdown = String::new();
   markdown.push_str("---\n");
   markdown.push_str(&format!("title: \"[AI Capture] {}\"\n", job.job.title));
   markdown.push_str("tags: [ai-capture, obsidian-agent]\n");
   markdown.push_str("---\n\n");
   markdown.push_str("## Key Insights\n");
-  markdown.push_str("- Insights extraction scaffold is active.\n");
-  markdown.push_str("- Gemini integration module is initialized.\n");
-  markdown.push_str("- Obsidian write path is CLI-first with fallback.\n\n");
+  if let Some(summary) = ai_summary {
+    markdown.push_str(summary);
+    markdown.push_str("\n\n");
+  } else {
+    markdown.push_str("- Gemini summary unavailable; set Gemini API key in Runtime Settings.\n");
+    markdown.push_str("- Obsidian write path is write-mode aware.\n");
+    markdown.push_str("- Media assets are persisted in local app storage.\n\n");
+  }
   markdown.push_str("## Source Files\n");
   for asset in &job.assets {
     markdown.push_str(&format!("- {} ({})\n", asset.original_path, asset.media_type));
   }
   markdown
+}
+
+fn generate_ai_summary(settings: &SettingsPayload, job: &JobDetails) -> Option<String> {
+  let api_key = secrets::resolve_gemini_api_key().ok().flatten()?;
+  let source_files = job
+    .assets
+    .iter()
+    .map(|asset| asset.original_path.clone())
+    .collect::<Vec<_>>();
+  let client = gemini::GeminiClient::new();
+
+  client
+    .generate_job_summary(&api_key, &settings.gemini_model, &source_files)
+    .ok()
+}
+
+#[tauri::command]
+fn get_gemini_api_key_status() -> Result<GeminiApiKeyStatus, String> {
+  let source = secrets::get_gemini_api_key_source()?;
+  Ok(GeminiApiKeyStatus {
+    configured: !matches!(source, secrets::GeminiApiKeySource::Missing),
+    source: source.as_str().to_string(),
+  })
+}
+
+#[tauri::command]
+fn save_gemini_api_key(api_key: String) -> Result<(), String> {
+  secrets::save_gemini_api_key(&api_key)
+}
+
+#[tauri::command]
+fn clear_gemini_api_key() -> Result<(), String> {
+  secrets::clear_gemini_api_key()
 }
 
 #[tauri::command]
@@ -59,6 +98,7 @@ fn enqueue_ingestion(
   let now = time_now_ms();
   let job_id = make_job_id(now);
   let title = ingestion::build_job_title(request.note_title.as_deref(), request.file_paths.len());
+  let assets = ingestion::prepare_assets(&request.file_paths, &state.media_root, now)?;
 
   let mut conn = state.conn()?;
   repository::insert_job_with_assets(
@@ -66,7 +106,7 @@ fn enqueue_ingestion(
     &job_id,
     &title,
     JobStatus::Queued.as_str(),
-    &request.file_paths,
+    &assets,
     now,
   )?;
 
@@ -130,8 +170,10 @@ fn preview_note(state: State<'_, AppState>, job_id: String) -> Result<PreviewNot
   let conn = state.conn()?;
   let maybe_job = repository::find_job_with_assets(&conn, job_id.trim())?;
   let job = maybe_job.ok_or_else(|| "job not found".to_string())?;
+  let settings = repository::get_settings(&conn)?;
+  let ai_summary = generate_ai_summary(&settings, &job);
   Ok(PreviewNoteResponse {
-    markdown: build_note_markdown(&job),
+    markdown: build_note_markdown(&job, ai_summary.as_deref()),
   })
 }
 
@@ -145,7 +187,8 @@ fn publish_note(
   let maybe_job = repository::find_job_with_assets(&conn, job_id.trim())?;
   let job = maybe_job.ok_or_else(|| "job not found".to_string())?;
   let settings = repository::get_settings(&conn)?;
-  let markdown = build_note_markdown(&job);
+  let ai_summary = generate_ai_summary(&settings, &job);
+  let markdown = build_note_markdown(&job, ai_summary.as_deref());
   obsidian::publish_note(&settings, &job.job.title, &markdown)
 }
 
@@ -164,6 +207,7 @@ pub fn run() {
             .build(),
         )?;
       }
+      app.handle().plugin(tauri_plugin_dialog::init())?;
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
@@ -174,6 +218,9 @@ pub fn run() {
       cancel_job,
       get_settings,
       save_settings,
+      get_gemini_api_key_status,
+      save_gemini_api_key,
+      clear_gemini_api_key,
       preview_note,
       publish_note
     ])

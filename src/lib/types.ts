@@ -27,5 +27,5 @@ export interface SettingsState {
   vaultPath: string
   obsidianCliPath: string
   geminiModel: string
-  writeMode: "cli_fallback"
+  writeMode: "cli_only" | "filesystem_only" | "cli_fallback"
 }
