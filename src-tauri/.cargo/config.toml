@@ -1,0 +1,10 @@
+[target.x86_64-pc-windows-gnu] 
+linker = "C:/Users/israel.toledo/mingw64/mingw64/bin/gcc.exe" 
+ 
+[build] 
+target = "x86_64-pc-windows-gnu" 
+ 
+[env] 
+CC = "C:/Users/israel.toledo/mingw64/mingw64/bin/gcc.exe" 
+CXX = "C:/Users/israel.toledo/mingw64/mingw64/bin/g++.exe" 
+AR = "C:/Users/israel.toledo/mingw64/mingw64/bin/ar.exe" 

@@ -1,0 +1,38 @@
+name: obsidian-ai-agent
+version: 0.1.0
+created: 2026-02-14
+
+stack:
+  package_manager: bun
+  frontend:
+    framework: vite
+    library: react
+    language: typescript
+    styling: tailwindcss-v4
+    ui_library: shadcn-ui
+    animation: framer-motion
+  desktop:
+    framework: tauri-v2
+    language: rust
+  storage:
+    primary: sqlite
+  ai:
+    provider: gemini-api
+  notes:
+    target: obsidian-vault
+    integration_mode: cli-first-with-filesystem-fallback
+
+conventions:
+  strict_typescript: true
+  default_exports: false
+  component_naming: PascalCase.tsx
+  utility_naming: kebab-case.ts
+  test_naming: "*.test.ts"
+
+scripts:
+  dev: bun run dev
+  build: bun run build
+  typecheck: bun run typecheck
+  test: bun run test
+  tauri_dev: bun run tauri:dev
+  tauri_build: bun run tauri:build

@@ -1,0 +1,25 @@
+2026-02-14 - Initialized Vite + React + TypeScript project with Bun.
+2026-02-14 - Initialized Tauri v2 project in src-tauri.
+2026-02-14 - Added project bootstrap docs (AGENTS.md, PROJECT-OVERVIEW.md, project.yaml, AGENT-EDITABLE.md).
+2026-02-14 - Began frontend system setup for shadcn/ui + Tailwind v4 and Obsidian-inspired brutalist visual language.
+2026-02-14 - Added shadcn/ui components and built a dark Obsidian-inspired brutalist dashboard with strict zero-radius tokens.
+2026-02-14 - Implemented frontend feature modules for ingestion queue, insight cards, note preview, and settings.
+2026-02-14 - Scaffolded Tauri Rust backend modules (app state, SQLite migrations/repository, ingestion helpers, Gemini stub, Obsidian writer).
+2026-02-14 - Added CLI-first + filesystem fallback Obsidian note publishing with vault detection and path safety checks.
+2026-02-14 - Copied and adapted Windows no-admin build workarounds from C:\dev\sinq (junction scripts, hooks.nsh, WebView2Loader.dll, cargo GNU config).
+2026-02-14 - Added Sinq architecture/workaround reference doc to C:\Users\israel.toledo\Documents\Projetos e Outros.
+2026-02-14 - Validation: typecheck OK, tests OK, frontend bundle validated via direct bunx command, Rust cargo check OK after env init.
+2026-02-14 - Final cleanup removed Vite starter assets and verified full frontend passes typecheck/tests/build.
+2026-02-14 - Built NSIS installer successfully via cargo-tauri from junction path; output generated in src-tauri/target/.../bundle/nsis.
+2026-02-15 - Added explicit junction wrapper scripts (`tauri-start-junction-dev.bat`, `tauri-build-junction-package.bat`) and package aliases for dev/package flows.
+2026-02-15 - Updated `build-junction.bat` with automatic `cargo tauri build` fallback when `bun run tauri:build` fails in this Windows environment.
+2026-02-15 - Updated scripts and root docs with the canonical no-admin startup/package workaround flow.
+2026-02-15 - Fixed Bun script aliases to use `./scripts/*.bat` so `bun run tauri:start:junction` resolves correctly.
+2026-02-15 - Added `cargo tauri dev` fallback in `scripts/dev-junction.bat` for Bun runtime crashes.
+2026-02-15 - Hardened ingestion persistence with atomic transaction insert (`job + assets`) and collision-resistant job IDs (`timestamp + atomic sequence`).
+2026-02-15 - Simplified TS invoke client API and removed redundant explicit async return annotations.
+2026-02-15 - Validation: typecheck passes; test run still fails under Bun/Vitest due junction path module-resolution bug (`/@fs/...DESENV~1...`).
+2026-02-15 - Added auto-junction scripts (`scripts/tauri-dev.bat`, `scripts/tauri-build.bat`) that infer current project name and support `--clean` and `--dry-run`.
+2026-02-15 - Added simple Bun aliases (`bun run tauri-dev`, `bun run tauri-build`) and updated project/shared docs with PowerShell-first usage for any Tauri project.
+2026-02-15 - Investigated `bun run tauri-dev` linker failure (`export ordinal too large`) on GNU target; fixed by removing `cdylib` from desktop crate types in `src-tauri/Cargo.toml`.
+2026-02-15 - Documented the GNU linker overflow root cause and fix in shared reference `C:\Users\israel.toledo\Documents\Projetos e Outros\SINQ-TAURI-WINDOWS-WORKAROUNDS.md`.

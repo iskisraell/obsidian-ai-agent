@@ -1,0 +1,70 @@
+import { motion } from "framer-motion"
+import { AudioLines, CheckCircle2, ImageIcon, LoaderCircle, Video } from "lucide-react"
+
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
+import type { MediaAsset } from "@/lib/types"
+
+const mediaIcon = {
+  audio: AudioLines,
+  video: Video,
+  image: ImageIcon,
+} as const
+
+const statusTone = {
+  queued: "bg-secondary text-secondary-foreground border-border",
+  processing: "bg-primary/15 text-primary border-primary/40",
+  completed: "bg-emerald-400/10 text-emerald-200 border-emerald-400/40",
+  failed: "bg-rose-500/10 text-rose-200 border-rose-500/40",
+} as const
+
+export function IngestionQueue({ assets }: { assets: MediaAsset[] }) {
+  return (
+    <Card className="grain border-primary/25 bg-card/70 shadow-[0_0_0_1px_rgba(123,77,255,0.2)]">
+      <CardHeader className="border-b border-border pb-4">
+        <CardTitle className="flex items-center justify-between text-sm tracking-[0.14em] uppercase">
+          Ingestion Queue
+          <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">
+            {assets.length} active
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 pt-4">
+        {assets.map((asset, index) => {
+          const Icon = mediaIcon[asset.type]
+          return (
+            <motion.div
+              key={asset.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.08, duration: 0.3 }}
+              className="flex items-center justify-between border border-border/80 bg-background/70 px-3 py-2"
+            >
+              <div className="flex items-center gap-3">
+                <div className="border border-primary/40 bg-primary/15 p-2">
+                  <Icon className="size-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{asset.name}</p>
+                  <p className="text-xs text-muted-foreground">{asset.durationLabel}</p>
+                </div>
+              </div>
+              <Badge
+                variant="outline"
+                className={cn("text-[10px] tracking-[0.12em] uppercase", statusTone[asset.status])}
+              >
+                {asset.status === "processing" ? (
+                  <LoaderCircle className="size-3 animate-spin" />
+                ) : asset.status === "completed" ? (
+                  <CheckCircle2 className="size-3" />
+                ) : null}
+                {asset.status}
+              </Badge>
+            </motion.div>
+          )
+        })}
+      </CardContent>
+    </Card>
+  )
+}
